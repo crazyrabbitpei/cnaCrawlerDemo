@@ -1,17 +1,16 @@
 'use strict'
-var fs = require('graceful-fs');
+var fs = require('fs');
 var request = require('request');
 var dateFormat = require('dateformat');
-var HashMap = require('hashmap');
 var cheerio = require("cheerio");
 
 const EventEmitter = require('events');
 class MyEmitter extends EventEmitter {}
 const bot = new MyEmitter();
 
-
-var stop_time =  new Date("2016-04-23");
+var stop_time =  new Date("2016-04-25");
 var domain = 'news.gamme.com.tw/category/all/page';
+
 var current_links=0
 var end_flag=0;
 
@@ -20,15 +19,15 @@ var news = new Array();
 
 bot.on('next_page',function(page){
     page++;
-    grapPage(page);
+    fetchPage(page);
 });
 bot.on('end_page',function(page){
-    console.log("To the end page:"+page+" Crawling links num:"+current_links);
+    console.log("To the end page:"+page);
     var result = JSON.stringify({
         "data":news_part
     },undefined,2);
     var date = dateFormat(new Date(),'yyyymmdd');
-    fs.appendFile(date+"_gamme.summary",result,function(err){
+    fs.writeFile(date+"_gamme.summary",result,function(err){
         if(err){
             console.log(err);
         }
@@ -43,7 +42,7 @@ bot.on('all_done',function(len){
         "data":news
     },undefined,2);
     var date = dateFormat(new Date(),'yyyymmdd');
-    fs.appendFile(date+"_gamme.news",result,function(err){
+    fs.writeFile(date+"_gamme.news",result,function(err){
         if(err){
             console.log(err);
         }
@@ -51,10 +50,9 @@ bot.on('all_done',function(len){
     
 });
 
-grapPage(1);
+fetchPage(1);
 
-
-function grapPage(page){
+function fetchPage(page){
     console.log(page);
     request({
         uri:'http://'+domain+page,
@@ -62,35 +60,36 @@ function grapPage(page){
             'User-Agent':'Mozilla/5.0 (compatible; CNADemoBot/1.0;'+
             ' +http://www.cs.ccu.edu.tw/~cp103m/bot.html)'
         },
-        timeout: 10000
+        timeout: 10*1000
     },function(error, response, body){
-        if(error){
-            console.log(error);
-            return;
+        if(!error&&response.statusCode==200){
+            //--Step1--show--
+            //console.log(body);
+
+            //--Step2--parse--cheerio basic practice
+            parseHtml(body,page,function(){
+                //--Step3--continue next page--event driven practice
+                if(end_flag==0){
+                    bot.emit('next_page',page);
+                }
+                else{
+                    bot.emit('end_page',page);
+                }
+            });
         }
-        else if(response.statusCode!==200){
+        else{
             console.log("response.statusCode:"+response.statusCode);
             return;
         }
-        //--Step1--show--
-        //console.log(body);
-        
-        //--Step2--parse--cheerio basic practice
-        parseHtml(body,page,function(){
-            //--Step3--continue next page--event driven practice
-            if(end_flag==0){
-                bot.emit('next_page',page);
-            }
-            else{
-                bot.emit('end_page',page);
-            }
-        });
+
 
     });
 }
 function parseHtml(body,index,fin)
 {
-    var $ = cheerio.load(body);
+    var $ = cheerio.load(body,{
+        normalizeWhitespace:true
+    });
     $("div.List-4").each(function(){
         var link = $(this);
         var href = link.children('.archive_img').attr('href');
@@ -130,7 +129,7 @@ function parseHtml(body,index,fin)
             /*--Method 2--*/
             //--Step4--grab article simultaneously--
             current_links++;
-            grapArticle(href,title,time,tags,img);
+            fetchArticle(href,title,time,tags,img);
         }
         else{
             end_flag=1;
@@ -138,10 +137,9 @@ function parseHtml(body,index,fin)
             return false;
         }
     });
-    console.log("return "+end_flag);
     fin();
 }
-function grapArticle(href,title,time,tags,img){
+function fetchArticle(href,title,time,tags,img){
     request({
         uri:href,
         headers:{
@@ -150,20 +148,10 @@ function grapArticle(href,title,time,tags,img){
         },
         timeout: 10000
     },function(error, response, body){
-        if(error){
-            console.log(error);
-            return;
-        }
-        else if(response.statusCode!==200){
-            console.log("response.statusCode:"+response.statusCode);
-            if(response.statusCode==503){
-                grapArticle(href,title,time,tags,img);
-            }
-            return;
-        }
-        else{
+        if(!error&&response.statusCode==200){
             current_links--;
             var $ = cheerio.load(body);
+            
             var article = $('div.entry').text();
             var imgs='';
 
@@ -182,7 +170,7 @@ function grapArticle(href,title,time,tags,img){
                 'time':time,
                 'tags':tags,
                 'href':href,
-                'small_img':img
+                'small_img':img,
                 'img':imgs,
                 'content':article
             }
@@ -190,6 +178,22 @@ function grapArticle(href,title,time,tags,img){
 
             if(current_links==0&&end_flag==1){
                 bot.emit('all_done');       
+            }
+
+        }
+        else{
+            if(error){
+                console.log(error);
+            }
+            else{
+                console.log("response.statusCode:"+response.statusCode);
+                if(response.statusCode==503){
+                    /*retry send link after 5 seconds*/
+                    setTimeout(function(){
+                        fetchArticle(href,title,time,tags,img);
+                    },5*1000)
+
+                }
             }
         }
     });

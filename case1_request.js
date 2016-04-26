@@ -2,9 +2,11 @@ var request = require('request');
 var fs = require('fs');
 
 var myurl = 'https://news.gamme.com.tw/category/all';//demolink
+/*error url*/
 //var myurl = 'https://news.gammse.com.tw/category/all';//domain not found
 //var myurl = 'https://www.dorm.ccu.edu.tw/test/announce.php?nn=18600';//timeout
 //var myurl = 'https://www.ptt.cc/bbs/Gossiping/M.14s61478330.A.12D.html';//404 not found
+/*error url*/
 
 //Step 1 --send a request--
 request({
@@ -23,7 +25,7 @@ request({
             //console.log(response);
             
             //Step 2 --save body--
-            fs.writeFile('./test/web_body.rec',body,'utf8',function(err){
+            fs.writeFile('./case1_request.result',body,'utf8',function(err){
                 if(err){
                     console.log(err);
                 }
@@ -31,9 +33,9 @@ request({
                     console.log('It\'s saved!')
                 }
             })
-            
     }
     else{
+        /*--print the error content useing error url--*/
         //console.log(error);
         console.log('error occur!');
     }

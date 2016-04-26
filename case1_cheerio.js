@@ -3,8 +3,10 @@ var fs = require('fs');
 var cheerio = require('cheerio');
 
 var myurl = 'https://news.gamme.com.tw/category/all';//demolink
+
+/*below--simple practice--below*/
 /*
-var html='<div class="b1">'+
+var html='<div class="b1">in block\n'+
             '<h3>hello</h3>'+
                 '<span id="s1">'+
                     '<p id="text1">a text</p>'+
@@ -15,9 +17,12 @@ var html='<div class="b1">'+
 
 var $ = cheerio.load(html);
 var result;
-result = $('span#s1').children('#link1').attr('href');
+result = $('div').text();
 console.log(result);
+return;
 */
+/*up--simple practice--up*/
+
 
 request({
     method:'GET',
@@ -32,7 +37,6 @@ request({
             //Step 3 --parse web site's content--
             var $ = cheerio.load(body);
             var news_summary = new Array();
-
             var result = $('div.List-4').each(function(){
                 var myroot = $(this);
                 var small_img = myroot.children('.archive_img').children('img').attr('src');
@@ -64,6 +68,7 @@ request({
                 }
                 /*--view object--*/
                 //console.log(data);
+                /*--get some information from object--*/
                 //console.log(data['title']);
 
                 /*--push to array--*/
@@ -75,15 +80,17 @@ request({
             //console.log(news_summary[0].title);
             
             /*--save it as JSON--*/
-            fs.writeFile('./article.test',JSON.stringify(news_summary,undefined,2),function(err){
-                    if(err){console.log('write false:'+err)}
+            //NOTICE: must use JSON.stringify for converting object to JSON string
+            fs.writeFile('./case1_cheerio.result',JSON.stringify(news_summary,undefined,2),function(err){
+                    if(err){
+                        console.log('write false:'+err)
+                    }
                     else{
                         console.log('ok!');
                     }
             });
     }
     else{
-        /*print the result*/
         console.log('error occur!');
     }
 
